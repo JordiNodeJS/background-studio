@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useTransition, useEffect, useActionState } from 'react';
+import React, { useState, useEffect, useActionState } from 'react';
 import { uploadAndProcessImageServerAction, type ActionState } from '@/lib/actions';
 import UploadForm from '@/components/upload-form';
 import ImageComparison from '@/components/image-comparison';
@@ -25,7 +25,7 @@ export default function ImageProcessor() {
   const [clientUploadProgress, setClientUploadProgress] = useState<number | null>(null);
   const { toast } = useToast();
   
-  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
+  const [state, formAction, isActionFormPending] = useActionState<ActionState, FormData>(
     uploadAndProcessImageServerAction,
     initialState
   );
@@ -55,29 +55,22 @@ export default function ImageProcessor() {
     } else if (state?.error) {
       setClientUploadProgress(null);
     }
-    // if isPending becomes false and there was an error, reset progress
-    if (!isPending && state?.error) {
+    // if isActionFormPending becomes false and there was an error, reset progress
+    if (!isActionFormPending && state?.error) {
         setClientUploadProgress(null);
     }
 
-
-  }, [state, toast, isPending]);
-
-
-  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    // Progress is handled in UploadForm, this just triggers the action
-    formAction(new FormData(event.currentTarget));
-  };
+  }, [state, toast, isActionFormPending]);
   
   // Reset progress if form is cleared or initial state
   useEffect(() => {
-    if (!originalImage && !processedImage && !state?.error && !isPending) {
+    if (!originalImage && !processedImage && !state?.error && !isActionFormPending) {
         setClientUploadProgress(null);
     }
-  }, [originalImage, processedImage, state?.error, isPending])
+  }, [originalImage, processedImage, state?.error, isActionFormPending]);
 
-  const showUploadForm = !isPending || (clientUploadProgress !== null && clientUploadProgress < 100);
-  const showProcessingSpinner = isPending && (clientUploadProgress === 100 || clientUploadProgress === null); // Show processing spinner if upload is done or wasn't tracked by client
+  const showUploadForm = !isActionFormPending || (clientUploadProgress !== null && clientUploadProgress < 100);
+  const showProcessingSpinner = isActionFormPending && (clientUploadProgress === 100 || clientUploadProgress === null); // Show processing spinner if upload is done or wasn't tracked by client
 
   return (
     <div className="space-y-8">
@@ -89,8 +82,8 @@ export default function ImageProcessor() {
           </CardHeader>
           <CardContent>
             <UploadForm 
-              formAction={handleFormSubmit} 
-              isPending={isPending} 
+              formAction={formAction} 
+              isActionFormPending={isActionFormPending} 
               uploadProgress={clientUploadProgress}
               setUploadProgress={setClientUploadProgress}
             />
@@ -107,7 +100,7 @@ export default function ImageProcessor() {
         </div>
       )}
 
-      {state?.error && !isPending && (
+      {state?.error && !isActionFormPending && (
          <Alert variant="destructive" className="shadow-md">
           <ImageOff className="h-5 w-5" />
           <AlertTitle className="font-semibold">Processing Failed</AlertTitle>
@@ -115,7 +108,7 @@ export default function ImageProcessor() {
         </Alert>
       )}
 
-      {originalImage && processedImage && !isPending && !state?.error && (
+      {originalImage && processedImage && !isActionFormPending && !state?.error && (
         <Card className="shadow-xl overflow-hidden border-border">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold">Compare Images</CardTitle>
