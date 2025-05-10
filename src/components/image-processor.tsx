@@ -1,8 +1,7 @@
 
 'use client';
 
-import React, { useState, useTransition, useEffect } from 'react';
-import { useFormState } from 'react-dom';
+import React, { useState, useTransition, useEffect, useActionState } from 'react';
 import { uploadAndProcessImageServerAction, type ActionState } from '@/lib/actions';
 import UploadForm from '@/components/upload-form';
 import ImageComparison from '@/components/image-comparison';
@@ -23,7 +22,7 @@ export default function ImageProcessor() {
   const [processedImage, setProcessedImage] = useState<string | null>(null);
   const { toast } = useToast();
   
-  const [state, formAction] = useFormState<ActionState, FormData>(
+  const [state, formAction] = useActionState<ActionState, FormData>(
     uploadAndProcessImageServerAction,
     initialState
   );
@@ -104,3 +103,4 @@ export default function ImageProcessor() {
     </div>
   );
 }
+
