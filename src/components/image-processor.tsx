@@ -50,7 +50,14 @@ export default function ImageProcessor() {
     }
 
     setOriginalImage(state?.originalImageUrl || null);
-    setProcessedImage(state?.processedImageUrl || null);
+    if (state?.processedImageUrl) {
+      // Add a cache-busting parameter to the processed image URL
+      const cacheBuster = Date.now(); // Using a timestamp as cache buster
+      setProcessedImage(`${state.processedImageUrl}?v=${cacheBuster}`);
+    } else {
+      setProcessedImage(null);
+    }
+    console.log(state?.processedImageUrl);
 
     if (state?.uploadProgress === 100 && !state.error) {
       setClientUploadProgress(100); // Sync with server state

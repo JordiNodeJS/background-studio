@@ -73,18 +73,47 @@ const ImageComparison: React.FC<ImageComparisonProps> = ({ originalImageUrl, pro
   const [aspectRatio, setAspectRatio] = useState<number>(16/9); // Default aspect ratio
 
   useEffect(() => {
-    const img = new window.Image();
-    img.src = originalImageUrl;
-    img.onload = () => {
-      setAspectRatio(img.naturalWidth / img.naturalHeight);
-      setImgLoaded(true);
-    };
-    img.onerror = () => {
-      // Fallback if image fails to load, keep default aspect ratio
-      setImgLoaded(true); 
-    }
-  }, [originalImageUrl]);
+ if (originalImageUrl && processedImageUrl) {
+ let originalLoaded = false;
+ let processedLoaded = false;
 
+      const checkBothLoaded = () => {
+ if (originalLoaded && processedLoaded) {
+ setImgLoaded(true);
+        }
+      };
+
+ const originalImg = new window.Image();
+ originalImg.src = originalImageUrl;
+ originalImg.onload = () => {
+ setAspectRatio(originalImg.naturalWidth / originalImg.naturalHeight);
+ originalLoaded = true;
+ checkBothLoaded();
+      };
+ originalImg.onerror = () => {
+ // Fallback if original image fails to load, allow processed to load
+ originalLoaded = true;
+ checkBothLoaded();
+      };
+
+      const processedImg = new window.Image();
+ processedImg.src = processedImageUrl;
+ processedImg.onload = () => {
+ processedLoaded = true;
+ console.log('Processed image loaded successfully:', processedImageUrl);
+ checkBothLoaded();
+        };
+ processedImg.onerror = () => {
+ // If processed image fails to load, still show original
+ processedLoaded = true;
+ console.error('Failed to load processed image:', processedImageUrl);
+ checkBothLoaded(); // Still check to potentially show original
+        };
+    }
+ return () => {
+ // Clean up is not necessary for Image objects used in this way.
+    };
+  }, [processedImageUrl]);
   if (!imgLoaded) {
     return (
       <div className="relative w-full max-w-4xl mx-auto bg-muted rounded-lg shadow-lg border border-border animate-pulse" style={{ aspectRatio: `${aspectRatio}` }}>
