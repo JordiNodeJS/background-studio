@@ -108,7 +108,7 @@ export default function UploadForm({ formAction, isPending }: UploadFormProps) {
           {isPending ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Processing...
+              Working...
             </>
           ) : (
             <>
@@ -126,3 +126,4 @@ export default function UploadForm({ formAction, isPending }: UploadFormProps) {
     </form>
   );
 }
+

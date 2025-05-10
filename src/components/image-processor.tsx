@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, ImageOff, CheckCircle2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Progress } from '@/components/ui/progress';
 
 const initialState: ActionState = {
   originalImageUrl: null,
@@ -60,21 +61,24 @@ export default function ImageProcessor() {
 
   return (
     <div className="space-y-8">
-      <Card className="shadow-xl overflow-hidden border-border">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold">Upload Your Image</CardTitle>
-          <CardDescription>Select an image file (PNG, JPG, JPEG) up to 5MB. The background will be magically erased!</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UploadForm formAction={handleSubmit} isPending={isPending} />
-        </CardContent>
-      </Card>
+      {!isPending && (
+        <Card className="shadow-xl overflow-hidden border-border">
+          <CardHeader>
+            <CardTitle className="text-2xl font-semibold">Upload Your Image</CardTitle>
+            <CardDescription>Select an image file (PNG, JPG, JPEG) up to 5MB. The background will be magically erased!</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <UploadForm formAction={handleSubmit} isPending={isPending} />
+          </CardContent>
+        </Card>
+      )}
 
       {isPending && (
         <div className="flex flex-col justify-center items-center p-12 space-y-4 bg-card rounded-lg shadow-md min-h-[300px] border border-border">
           <Loader2 className="h-16 w-16 animate-spin text-primary" />
-          <p className="text-xl font-medium text-foreground">Processing your image...</p>
-          <p className="text-muted-foreground">This might take a moment. Please wait.</p>
+          <p className="text-xl font-medium text-foreground">Uploading &amp; Processing...</p>
+          <p className="text-muted-foreground text-center max-w-md">Your image is being uploaded and processed. This might take a moment, please wait.</p>
+          <Progress value={50} className="w-3/4 max-w-xs mt-4 h-2.5 animate-pulse" />
         </div>
       )}
 
