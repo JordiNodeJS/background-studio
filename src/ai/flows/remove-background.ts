@@ -59,22 +59,49 @@ const removeBackgroundFlow = ai.defineFlow(
     // return output!;
 
     const {media} = await ai.generate({
-      // IMPORTANT: ONLY the googleai/gemini-2.0-flash-exp model is able to generate images. You MUST use exactly this model to generate images.
-      model: 'googleai/gemini-2.0-flash-exp',
-
-      // simple prompt
-      prompt: [{media: {url: input.imageDataUri}}, {text: 'Remove the background from this image'}],
-      // OR, existing images can be provided in-context for editing, character reuse, etc.
-      // prompt: [
-      //   {media: {url: 'data:<mime_type>;base64,<b64_encoded_image>'}},
-      //   {text: 'generate an image of this character in a jungle'},
-      // ],
-
-      config: {
-        responseModalities: ['TEXT', 'IMAGE'], // MUST provide both TEXT and IMAGE, IMAGE only won't work
-      },
+      prompt: [
+        {media: {url: input.imageDataUri}},
+        {
+          text: 'Remove the background from this image, keeping the main subject in the foreground. Ensure the output is a high-quality image with a transparent background. If the image is a person, keep their hair and fine details intact.',
+        },
+      ],
     });
 
-    return {processedImageDataUri: media.url!};
+    const formData = new FormData();
+    // Assuming the data URI is for a PNG. You might need to extract the actual mime type.
+    const byteCharacters = atob(input.imageDataUri.split(',')[1]);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    formData.append('image', new Blob([byteArray], {type: 'image/png'}), 'input-01.png');
+
+    const response = await fetch(
+      'http://ec2-34-254-248-103.eu-west-1.compute.amazonaws.com:3001/remove-background/link',
+      {
+        method: 'POST',
+        body: formData,
+        headers: {
+          // The 'Content-Type' header is automatically set to 'multipart/form-data'
+          // when using FormData.
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(`API call failed with status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    // Assuming the response structure is { data: { url: "..." } }
+    if (result.data && result.data.url) {
+      // You might need to fetch the image data from the URL if you need a data URI
+      // For now, we'll return the URL directly in a new property
+      return {processedImageUrl: result.data.url} as any; // Need to adjust output schema
+    } else {
+      throw new Error('Invalid response format from the API.');
+    }
   }
 );
