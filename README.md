@@ -7,16 +7,18 @@ This application is built with Next.js App Router, Server Actions, and Genkit fo
 
 ## Core Features
 
-- **Image Upload**: Users can upload images (PNG, JPG, JPEG, up to 5MB) from their local device with client-side validation and preview.
+- **Image Upload**: Users can upload images (PNG, JPG, JPEG, up to 20MB) from their local device with client-side validation and preview.
 - **AI Background Removal**: Uploaded images are processed by a Genkit AI flow (utilizing Google AI) to remove the background.
 - **Image Comparison**: A visual interface displays the original and processed images side-by-side with a draggable slider for easy comparison. The comparison view dynamically adjusts to the aspect ratio of the uploaded image.
 - **Toast Notifications**: Users receive clear feedback on the success or failure of operations through toast notifications.
 - **Responsive Design**: The application is designed to work seamlessly across various devices and screen sizes.
+- **Upload Progress**: Visual feedback for image upload progress.
+
 
 ## Tech Stack
 
 - Next.js 15 (App Router)
-- React 18 (using `useFormState` and `useTransition`)
+- React 18 (using `React.useActionState` and `useTransition`)
 - TypeScript
 - Tailwind CSS (with ShadCN UI components for a polished look and feel)
 - Genkit (for AI flow integration)
@@ -89,7 +91,7 @@ npm run genkit:watch
   /components
     ImageComparison.tsx     # Component for side-by-side image comparison with a draggable slider
     ImageProcessor.tsx      # Client component managing overall state, Server Action calls, and UI updates
-    UploadForm.tsx          # Client component for image selection, preview, and form submission
+    UploadForm.tsx          # Client component for image selection, preview, progress, and form submission
   /lib
     actions.ts              # Server Actions handling image processing, Genkit calls, and file I/O
   page.tsx                  # Main (home) page of the application
@@ -107,10 +109,10 @@ npm run genkit:watch
 
 ## Background Removal Process
 
-1.  The user selects an image through the `UploadForm.tsx` component. Client-side validation (file type, size) occurs.
+1.  The user selects an image through the `UploadForm.tsx` component. Client-side validation (file type, size up to 20MB) occurs, and upload progress is displayed.
 2.  Upon submission, the form data is passed to a Server Action (`uploadAndProcessImageServerAction` in `actions.ts`).
 3.  The Server Action:
-    a.  Validates the file again on the server.
+    a.  Validates the file again on the server (up to 20MB).
     b.  Saves the original image to the `public/images-input/` directory.
     c.  Converts the image to a data URI.
     d.  Calls the `removeBackground` Genkit flow (from `src/ai/flows/remove-background.ts`) with the image data URI.
@@ -126,3 +128,6 @@ npm run genkit:watch
 -   **File System**: The application writes images to the `public` directory. In a Vercel deployment or similar serverless environments, the `public` directory is part of the build output and typically not writable at runtime for persistent storage. For persistent storage in such environments, a dedicated file storage service (like Firebase Storage, AWS S3, etc.) would be required. This starter assumes a local development environment or a server environment where the `public` folder is writable.
 -   **Error Handling**: Basic error handling is implemented, with messages displayed via toasts.
 -   **Styling**: The application uses Tailwind CSS and ShadCN UI components, adhering to the professional design specifications provided (neutral grays, soft blues, teal accents).
+-   **Upload Progress**: Upload progress is simulated on the client-side for immediate user feedback. Server-side processing time is separate and indicated by a general "processing" state.
+
+```

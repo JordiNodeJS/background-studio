@@ -16,18 +16,19 @@ const initialState: ActionState = {
   processedImageUrl: null,
   error: null,
   message: null,
+  uploadProgress: null,
 };
 
 export default function ImageProcessor() {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [processedImage, setProcessedImage] = useState<string | null>(null);
+  const [clientUploadProgress, setClientUploadProgress] = useState<number | null>(null);
   const { toast } = useToast();
   
-  const [state, formAction] = useActionState<ActionState, FormData>(
+  const [state, formAction, isPending] = useActionState<ActionState, FormData>(
     uploadAndProcessImageServerAction,
     initialState
   );
-  const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
     if (state?.message) {
@@ -43,42 +44,66 @@ export default function ImageProcessor() {
         description: state.error,
         variant: 'destructive',
       });
+      setClientUploadProgress(null); // Reset progress on error
     }
 
-    // Always update images based on the latest server action state
     setOriginalImage(state?.originalImageUrl || null);
     setProcessedImage(state?.processedImageUrl || null);
 
-  }, [state, toast]);
+    if (state?.uploadProgress === 100 && !state.error) {
+      setClientUploadProgress(100); // Sync with server state
+    } else if (state?.error) {
+      setClientUploadProgress(null);
+    }
+    // if isPending becomes false and there was an error, reset progress
+    if (!isPending && state?.error) {
+        setClientUploadProgress(null);
+    }
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    startTransition(() => {
-      formAction(formData);
-    });
+
+  }, [state, toast, isPending]);
+
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    // Progress is handled in UploadForm, this just triggers the action
+    formAction(new FormData(event.currentTarget));
   };
+  
+  // Reset progress if form is cleared or initial state
+  useEffect(() => {
+    if (!originalImage && !processedImage && !state?.error && !isPending) {
+        setClientUploadProgress(null);
+    }
+  }, [originalImage, processedImage, state?.error, isPending])
+
+  const showUploadForm = !isPending || (clientUploadProgress !== null && clientUploadProgress < 100);
+  const showProcessingSpinner = isPending && (clientUploadProgress === 100 || clientUploadProgress === null); // Show processing spinner if upload is done or wasn't tracked by client
 
   return (
     <div className="space-y-8">
-      {!isPending && (
+      {showUploadForm && (
         <Card className="shadow-xl overflow-hidden border-border">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold">Upload Your Image</CardTitle>
-            <CardDescription>Select an image file (PNG, JPG, JPEG) up to 5MB. The background will be magically erased!</CardDescription>
+            <CardDescription>Select an image file (PNG, JPG, JPEG) up to 20MB. The background will be magically erased!</CardDescription>
           </CardHeader>
           <CardContent>
-            <UploadForm formAction={handleSubmit} isPending={isPending} />
+            <UploadForm 
+              formAction={handleFormSubmit} 
+              isPending={isPending} 
+              uploadProgress={clientUploadProgress}
+              setUploadProgress={setClientUploadProgress}
+            />
           </CardContent>
         </Card>
       )}
 
-      {isPending && (
+      {showProcessingSpinner && (
         <div className="flex flex-col justify-center items-center p-12 space-y-4 bg-card rounded-lg shadow-md min-h-[300px] border border-border">
           <Loader2 className="h-16 w-16 animate-spin text-primary" />
-          <p className="text-xl font-medium text-foreground">Uploading &amp; Processing...</p>
-          <p className="text-muted-foreground text-center max-w-md">Your image is being uploaded and processed. This might take a moment, please wait.</p>
-          <Progress value={50} className="w-3/4 max-w-xs mt-4 h-2.5 animate-pulse" />
+          <p className="text-xl font-medium text-foreground">Processing Image...</p>
+          <p className="text-muted-foreground text-center max-w-md">The AI is working its magic. This might take a few moments.</p>
+          <Progress value={undefined} className="w-3/4 max-w-xs mt-4 h-2.5 animate-pulse" /> {/* Indeterminate progress for processing */}
         </div>
       )}
 
@@ -90,7 +115,7 @@ export default function ImageProcessor() {
         </Alert>
       )}
 
-      {originalImage && processedImage && !isPending && (
+      {originalImage && processedImage && !isPending && !state?.error && (
         <Card className="shadow-xl overflow-hidden border-border">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold">Compare Images</CardTitle>
@@ -107,4 +132,3 @@ export default function ImageProcessor() {
     </div>
   );
 }
-

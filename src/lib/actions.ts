@@ -10,7 +10,7 @@ import type { RemoveBackgroundInput } from '@/ai/flows/remove-background';
 const inputDir = path.join(process.cwd(), 'public', 'images-input');
 const outputDir = path.join(process.cwd(), 'public', 'images-output');
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 
 const fileToDataUri = (fileBuffer: Buffer, mimeType: string): string => {
@@ -37,6 +37,7 @@ export interface ActionState {
   processedImageUrl?: string | null;
   error?: string | null;
   message?: string | null;
+  uploadProgress?: number | null;
 }
 
 export async function uploadAndProcessImageServerAction(
@@ -50,15 +51,15 @@ export async function uploadAndProcessImageServerAction(
     const file = formData.get('image') as File | null;
 
     if (!file) {
-      return { ...prevState, error: 'No image file provided.' };
+      return { ...prevState, error: 'No image file provided.', uploadProgress: null };
     }
 
     if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-      return { ...prevState, error: 'Invalid file type. Only PNG, JPG, JPEG are allowed.' };
+      return { ...prevState, error: 'Invalid file type. Only PNG, JPG, JPEG are allowed.', uploadProgress: null };
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return { ...prevState, error: 'File is too large. Maximum size is 5MB.' };
+      return { ...prevState, error: 'File is too large. Maximum size is 20MB.', uploadProgress: null };
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -69,6 +70,11 @@ export async function uploadAndProcessImageServerAction(
 
     await writeFile(originalPath, fileBuffer);
 
+    // Simulate upload progress completion for the server part
+    // Actual streaming upload progress would require a different setup (e.g., websockets or a dedicated upload handler)
+    // For Server Actions, we consider upload complete once the file is on the server.
+    // The client-side will handle its part of the progress display.
+    
     const originalImageDataUri = fileToDataUri(fileBuffer, file.type);
     
     const genkitInput: RemoveBackgroundInput = {
@@ -78,7 +84,7 @@ export async function uploadAndProcessImageServerAction(
     const genkitOutput = await removeBackground(genkitInput);
 
     if (!genkitOutput.processedImageDataUri) {
-      return { ...prevState, error: 'Background removal failed. No processed image data returned.' , originalImageUrl: originalPublicUrl};
+      return { ...prevState, error: 'Background removal failed. No processed image data returned.' , originalImageUrl: originalPublicUrl, uploadProgress: 100};
     }
     
     const { buffer: processedImageBuffer, mimeType: processedMimeType } = dataUriToBuffer(genkitOutput.processedImageDataUri);
@@ -98,6 +104,7 @@ export async function uploadAndProcessImageServerAction(
       originalImageUrl: originalPublicUrl,
       processedImageUrl: processedPublicUrl,
       error: null,
+      uploadProgress: 100, // Indicate completion
     };
   } catch (error) {
     console.error('Error processing image:', error);
@@ -111,13 +118,16 @@ export async function uploadAndProcessImageServerAction(
     if (file) {
         try {
             const originalFileExtension = path.extname(file.name) || `.${file.type.split('/')[1] || 'png'}`;
-            const tempOriginalFilename = formData.get('tempOriginalFilename') as string || `${uuidv4()}${originalFileExtension}`; // Attempt to retrieve if set
-            if (tempOriginalFilename) {
-                 originalPublicUrlOnError = `/images-input/${tempOriginalFilename}`;
-            }
+            // This tempOriginalFilename logic isn't robust for server actions like this.
+            // If the file save failed, the URL might not be valid.
+            // For simplicity, we'll just pass null if there was an error before saving.
+            // const tempOriginalFilename = formData.get('tempOriginalFilename') as string || `${uuidv4()}${originalFileExtension}`; 
+            // if (tempOriginalFilename) {
+            //      originalPublicUrlOnError = `/images-input/${tempOriginalFilename}`;
+            // }
         } catch (e) { /* ignore, best effort */ }
     }
 
-    return { ...prevState, error: errorMessage, originalImageUrl: originalPublicUrlOnError, processedImageUrl: null };
+    return { ...prevState, error: errorMessage, originalImageUrl: originalPublicUrlOnError, processedImageUrl: null, uploadProgress: null };
   }
 }
