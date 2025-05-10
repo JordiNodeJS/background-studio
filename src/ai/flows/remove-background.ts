@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import path from 'path'; // For path.extname if needed for constructing Blob filename
+// path import removed as it's not used while the Genkit prompt is commented out.
 
 const RemoveBackgroundInputSchema = z.object({
   imageDataUri: z
@@ -34,6 +34,7 @@ export async function removeBackground(input: RemoveBackgroundInput): Promise<Re
 
 // This prompt definition is currently unused by the active external API logic path.
 // It can be kept for potential future use with a Genkit multimodal model.
+/*
 const removeBackgroundPrompt = ai.definePrompt({
   name: 'removeBackgroundPrompt',
   input: {schema: RemoveBackgroundInputSchema},
@@ -48,6 +49,7 @@ const removeBackgroundPrompt = ai.definePrompt({
 
   Return the processed image as a data URI.`, 
 });
+*/
 
 const removeBackgroundFlow = ai.defineFlow(
   {
@@ -81,7 +83,8 @@ const removeBackgroundFlow = ai.defineFlow(
     // Logic to call the external background removal API
     const parts = input.imageDataUri.split(',');
     if (parts.length !== 2 || !parts[0].includes(';base64')) {
-        throw new Error('Invalid Data URI format for input image. Expected "data:<mimetype>;base64,<data>".');
+        console.error("Invalid Data URI format for input image in removeBackgroundFlow. URI start:", input.imageDataUri.substring(0,100));
+        throw new Error('Internal error: Invalid image data format before API call.');
     }
     const meta = parts[0];
     const base64Data = parts[1];
@@ -105,24 +108,28 @@ const removeBackgroundFlow = ai.defineFlow(
         },
       );
     } catch (e: any) {
-        console.error("Error calling external API:", e);
-        throw new Error(`Failed to connect to external background removal API: ${e.message}`);
+        const errorMessage = e.message ? e.message.substring(0,1000) : String(e).substring(0,1000);
+        console.error("Error connecting to external background removal API:", errorMessage);
+        throw new Error(`Failed to connect to background removal service. Please check network or API status.`);
     }
     
+    const responseBodyText = await apiResponse.text().catch(async (textErr: any) => {
+        const errorMsg = textErr.message ? textErr.message.substring(0,500) : String(textErr).substring(0,500);
+        console.error("Could not read response body from external API:", apiResponse.status, errorMsg);
+        throw new Error(`Background removal service responded (status ${apiResponse.status}) but body was unreadable.`);
+    });
 
     if (!apiResponse.ok) {
-      const errorBody = await apiResponse.text().catch(() => "Could not read error body");
-      console.error("External API Error:", apiResponse.status, errorBody);
-      throw new Error(`External background removal API call failed with status: ${apiResponse.status}. Details: ${errorBody}`);
+      console.error("External background removal API Error:", apiResponse.status, responseBodyText.substring(0, 1000));
+      throw new Error(`Background removal service failed (status ${apiResponse.status}). Details: ${responseBodyText.substring(0, 300)}`);
     }
 
     let result;
     try {
-        result = await apiResponse.json();
+        result = JSON.parse(responseBodyText);
     } catch (e: any) {
-        const responseText = await apiResponse.text().catch(() => "Could not read response text");
-        console.error("Failed to parse JSON response from external API. Response text:", responseText);
-        throw new Error(`Failed to parse JSON response from external API: ${e.message}. Response was: ${responseText.substring(0, 200)}`);
+        console.error("Failed to parse JSON from external background removal API. Response text:", responseBodyText.substring(0,1000));
+        throw new Error(`Background removal service returned an unexpected response. Preview: ${responseBodyText.substring(0, 200)}`);
     }
     
 
@@ -133,17 +140,26 @@ const removeBackgroundFlow = ai.defineFlow(
       try {
         imageFetchResponse = await fetch(processedImageExternalUrl);
       } catch (e: any) {
-        console.error(`Error fetching processed image from URL: ${processedImageExternalUrl}`, e);
-        throw new Error(`Failed to connect to fetch processed image from ${processedImageExternalUrl}: ${e.message}`);
+        const errorMsg = e.message ? e.message.substring(0,1000) : String(e).substring(0,1000);
+        console.error(`Error connecting to fetch processed image from URL: ${processedImageExternalUrl}`, errorMsg);
+        throw new Error(`Failed to connect to retrieve processed image. Check network or image URL.`);
       }
 
       if (!imageFetchResponse.ok) {
-        const errorBody = await imageFetchResponse.text().catch(() => "Could not read error body");
-        console.error(`Failed to fetch processed image from ${processedImageExternalUrl}: ${imageFetchResponse.status}`, errorBody);
-        throw new Error(`Failed to fetch processed image from ${processedImageExternalUrl}: ${imageFetchResponse.statusText}. Details: ${errorBody}`);
+        const errorBodyText = await imageFetchResponse.text().catch(() => `Status ${imageFetchResponse.statusText || imageFetchResponse.status}`);
+        console.error(`Failed to fetch processed image from ${processedImageExternalUrl}: ${imageFetchResponse.status}`, errorBodyText.substring(0, 1000));
+        throw new Error(`Failed to retrieve processed image (status ${imageFetchResponse.status}). Resource: ${processedImageExternalUrl.substring(0,100)}...`);
       }
       
-      const fetchedImageArrayBuffer = await imageFetchResponse.arrayBuffer();
+      let fetchedImageArrayBuffer;
+      try {
+        fetchedImageArrayBuffer = await imageFetchResponse.arrayBuffer();
+      } catch (e: any) {
+         const errorMsg = e.message ? e.message.substring(0,1000) : String(e).substring(0,1000);
+        console.error(`Error reading arrayBuffer from fetched image: ${processedImageExternalUrl}`, errorMsg);
+        throw new Error(`Failed to read data from processed image. Resource: ${processedImageExternalUrl.substring(0,100)}...`);
+      }
+
       const fetchedImageBuffer = Buffer.from(fetchedImageArrayBuffer);
       const fetchedMimeType = imageFetchResponse.headers.get('content-type') || 'image/png';
 
@@ -151,8 +167,8 @@ const removeBackgroundFlow = ai.defineFlow(
       
       return { processedImageDataUri: processedImageDataUri };
     } else {
-      console.error("Invalid API response structure from external background removal service:", result);
-      throw new Error('Invalid response format from the external background removal API or missing URL.');
+      console.error("Invalid API response structure from external background removal service:", JSON.stringify(result).substring(0,1000));
+      throw new Error('Background removal service returned invalid data or missing URL.');
     }
   }
 );
