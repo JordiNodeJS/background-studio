@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronLeftRight } from 'lucide-react'; // Using lucide icon
+import { ChevronsLeftRight } from 'lucide-react'; // Using lucide icon
 
 interface ImageComparisonProps {
   originalImageUrl: string;
@@ -126,7 +126,7 @@ const ImageComparison: React.FC<ImageComparisonProps> = ({ originalImageUrl, pro
         style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
       >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-accent border-2 border-background flex items-center justify-center shadow-md opacity-80 group-hover:opacity-100 transition-opacity">
-          <ChevronLeftRight className="text-accent-foreground h-5 w-5" />
+          <ChevronsLeftRight className="text-accent-foreground h-5 w-5" />
         </div>
       </div>
     </div>
