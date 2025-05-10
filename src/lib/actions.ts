@@ -20,16 +20,31 @@ const fileToDataUri = (fileBuffer: Buffer, mimeType: string): string => {
 const dataUriToBuffer = (dataUri: string): { buffer: Buffer; mimeType: string } => {
   const parts = dataUri.split(',');
   if (parts.length !== 2) {
-    throw new Error('Invalid Data URI format');
+    throw new Error('Invalid Data URI format: expected two parts separated by a comma.');
   }
-  const meta = parts[0]; 
-  const base64Data = parts[1];
   
-  const mimeTypeMatch = meta.match(/:(.*?);/);
+  const meta = parts[0]; // e.g., "data:image/png;base64"
+  const base64Data = parts[1];
+
+  if (!meta.includes(';base64')) {
+    throw new Error('Invalid Data URI format: must be base64 encoded.');
+  }
+  
+  const mimeTypeMatch = meta.match(/^data:(.*?);base64$/);
   const mimeType = mimeTypeMatch && mimeTypeMatch[1] ? mimeTypeMatch[1] : 'application/octet-stream';
 
-  const buffer = Buffer.from(base64Data, 'base64');
-  return { buffer, mimeType };
+  if (mimeType === 'application/octet-stream' && !meta.startsWith('data:')) {
+    // If it's octet-stream and doesn't look like a data URI, something is wrong.
+    throw new Error('Invalid Data URI: unrecognized mime type or format.');
+  }
+
+  try {
+    const buffer = Buffer.from(base64Data, 'base64');
+    return { buffer, mimeType };
+  } catch (error) {
+    console.error("Error decoding base64 data from Data URI:", error);
+    throw new Error("Failed to decode base64 data from Data URI.");
+  }
 };
 
 export interface ActionState {
@@ -44,6 +59,7 @@ export async function uploadAndProcessImageServerAction(
   prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  let originalPublicUrl: string | null = null;
   try {
     await mkdir(inputDir, { recursive: true });
     await mkdir(outputDir, { recursive: true });
@@ -66,7 +82,7 @@ export async function uploadAndProcessImageServerAction(
     const originalFileExtension = path.extname(file.name) || `.${file.type.split('/')[1] || 'png'}`;
     const originalFilename = `${uuidv4()}${originalFileExtension}`;
     const originalPath = path.join(inputDir, originalFilename);
-    const originalPublicUrl = `/images-input/${originalFilename}`;
+    originalPublicUrl = `/images-input/${originalFilename}`; // Assign here for use in catch block
 
     await writeFile(originalPath, fileBuffer);
     
@@ -83,10 +99,15 @@ export async function uploadAndProcessImageServerAction(
     }
     
     const { buffer: processedImageBuffer, mimeType: processedMimeType } = dataUriToBuffer(genkitOutput.processedImageDataUri);
-    const processedFileExtensionGuess = processedMimeType.split('/')[1];
-    const processedFileExtension = processedFileExtensionGuess && ALLOWED_FILE_TYPES.map(t => t.split('/')[1]).includes(processedFileExtensionGuess) 
-                                   ? `.${processedFileExtensionGuess}` 
-                                   : '.png'; // Default to png if mime type is odd or not an image
+    
+    // Try to guess extension from mimeType, default to .png
+    let processedFileExtension = '.png';
+    if (processedMimeType.startsWith('image/')) {
+        const typePart = processedMimeType.split('/')[1];
+        if (typePart && ALLOWED_FILE_TYPES.map(t => t.split('/')[1]).includes(typePart)) {
+            processedFileExtension = `.${typePart}`;
+        }
+    }
                                    
     const processedFilename = `${uuidv4()}-processed${processedFileExtension}`;
     const processedPath = path.join(outputDir, processedFilename);
@@ -99,30 +120,15 @@ export async function uploadAndProcessImageServerAction(
       originalImageUrl: originalPublicUrl,
       processedImageUrl: processedPublicUrl,
       error: null,
-      uploadProgress: 100, // Indicate completion
+      uploadProgress: 100,
     };
   } catch (error) {
-    console.error('Error processing image:', error);
+    console.error('Error in uploadAndProcessImageServerAction:', error);
     let errorMessage = 'An unexpected error occurred during processing.';
     if (error instanceof Error) {
         errorMessage = error.message;
     }
-    // Try to return original image URL even if processing fails partially
-    const file = formData.get('image') as File | null;
-    let originalPublicUrlOnError = null;
-    if (file) {
-        try {
-            // const originalFileExtension = path.extname(file.name) || `.${file.type.split('/')[1] || 'png'}`;
-            // This tempOriginalFilename logic isn't robust for server actions like this.
-            // If the file save failed, the URL might not be valid.
-            // For simplicity, we'll just pass null if there was an error before saving.
-            // const tempOriginalFilename = formData.get('tempOriginalFilename') as string || `${uuidv4()}${originalFileExtension}`; 
-            // if (tempOriginalFilename) {
-            //      originalPublicUrlOnError = `/images-input/${tempOriginalFilename}`;
-            // }
-        } catch (e) { /* ignore, best effort */ }
-    }
-
-    return { ...prevState, error: errorMessage, originalImageUrl: originalPublicUrlOnError, processedImageUrl: null, uploadProgress: null };
+    // Return originalImageUrl if it was saved before the error
+    return { ...prevState, error: errorMessage, originalImageUrl: originalPublicUrl, processedImageUrl: null, uploadProgress: null };
   }
 }

@@ -10,6 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import path from 'path'; // For path.extname if needed for constructing Blob filename
 
 const RemoveBackgroundInputSchema = z.object({
   imageDataUri: z
@@ -31,6 +32,8 @@ export async function removeBackground(input: RemoveBackgroundInput): Promise<Re
   return removeBackgroundFlow(input);
 }
 
+// This prompt definition is currently unused by the active external API logic path.
+// It can be kept for potential future use with a Genkit multimodal model.
 const removeBackgroundPrompt = ai.definePrompt({
   name: 'removeBackgroundPrompt',
   input: {schema: RemoveBackgroundInputSchema},
@@ -52,56 +55,104 @@ const removeBackgroundFlow = ai.defineFlow(
     inputSchema: RemoveBackgroundInputSchema,
     outputSchema: RemoveBackgroundOutputSchema,
   },
-  async input => {
-    //TODO: Call an external API to remove the background from the image.
-    //For now, just return the original image.
-    // const {output} = await removeBackgroundPrompt(input);
-    // return output!;
-
-    const {media} = await ai.generate({
+  async (input: RemoveBackgroundInput): Promise<RemoveBackgroundOutput> => {
+    // The ai.generate block for using Genkit/Gemini for background removal is commented out.
+    // The current implementation uses an external API.
+    /*
+    const geminiResponse = await ai.generate({
+      model: 'googleai/gemini-2.0-flash-exp', 
       prompt: [
         {media: {url: input.imageDataUri}},
         {
-          text: 'Remove the background from this image, keeping the main subject in the foreground. Ensure the output is a high-quality image with a transparent background. If the image is a person, keep their hair and fine details intact.',
+          text: 'Remove the background from this image, keeping the main subject in the foreground. Ensure the output is a high-quality image with a transparent background. If the image is a person, keep their hair and fine details intact. Return only the processed image.',
         },
       ],
+      config: {
+        responseModalities: ['IMAGE'],
+      }
     });
 
+    if (!geminiResponse.media || !geminiResponse.media.url) {
+      throw new Error('AI image processing failed to return an image.');
+    }
+    return { processedImageDataUri: geminiResponse.media.url };
+    */
+
+    // Logic to call the external background removal API
+    const parts = input.imageDataUri.split(',');
+    if (parts.length !== 2 || !parts[0].includes(';base64')) {
+        throw new Error('Invalid Data URI format for input image. Expected "data:<mimetype>;base64,<data>".');
+    }
+    const meta = parts[0];
+    const base64Data = parts[1];
+    
+    const mimeTypeMatch = meta.match(/:(.*?);/);
+    const mimeType = mimeTypeMatch && mimeTypeMatch[1] ? mimeTypeMatch[1] : 'application/octet-stream';
+    
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
     const formData = new FormData();
-    // Assuming the data URI is for a PNG. You might need to extract the actual mime type.
-    const byteCharacters = atob(input.imageDataUri.split(',')[1]);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    formData.append('image', new Blob([byteArray], {type: 'image/png'}), 'input-01.png');
+    const fileExtension = mimeType.startsWith('image/') ? `.${mimeType.split('/')[1]}` : '.png';
+    formData.append('image', new Blob([imageBuffer], { type: mimeType }), `input-image${fileExtension}`);
 
-    const response = await fetch(
-      'http://ec2-34-254-248-103.eu-west-1.compute.amazonaws.com:3001/remove-background/link',
-      {
-        method: 'POST',
-        body: formData,
-        headers: {
-          // The 'Content-Type' header is automatically set to 'multipart/form-data'
-          // when using FormData.
+    let apiResponse;
+    try {
+      apiResponse = await fetch(
+        'http://ec2-34-254-248-103.eu-west-1.compute.amazonaws.com:3001/remove-background/link',
+        {
+          method: 'POST',
+          body: formData,
         },
-      },
-    );
+      );
+    } catch (e: any) {
+        console.error("Error calling external API:", e);
+        throw new Error(`Failed to connect to external background removal API: ${e.message}`);
+    }
+    
 
-    if (!response.ok) {
-      throw new Error(`API call failed with status: ${response.status}`);
+    if (!apiResponse.ok) {
+      const errorBody = await apiResponse.text().catch(() => "Could not read error body");
+      console.error("External API Error:", apiResponse.status, errorBody);
+      throw new Error(`External background removal API call failed with status: ${apiResponse.status}. Details: ${errorBody}`);
     }
 
-    const result = await response.json();
+    let result;
+    try {
+        result = await apiResponse.json();
+    } catch (e: any) {
+        const responseText = await apiResponse.text().catch(() => "Could not read response text");
+        console.error("Failed to parse JSON response from external API. Response text:", responseText);
+        throw new Error(`Failed to parse JSON response from external API: ${e.message}. Response was: ${responseText.substring(0, 200)}`);
+    }
+    
 
-    // Assuming the response structure is { data: { url: "..." } }
     if (result.data && result.data.url) {
-      // You might need to fetch the image data from the URL if you need a data URI
-      // For now, we'll return the URL directly in a new property
-      return {processedImageUrl: result.data.url} as any; // Need to adjust output schema
+      const processedImageExternalUrl = result.data.url;
+      
+      let imageFetchResponse;
+      try {
+        imageFetchResponse = await fetch(processedImageExternalUrl);
+      } catch (e: any) {
+        console.error(`Error fetching processed image from URL: ${processedImageExternalUrl}`, e);
+        throw new Error(`Failed to connect to fetch processed image from ${processedImageExternalUrl}: ${e.message}`);
+      }
+
+      if (!imageFetchResponse.ok) {
+        const errorBody = await imageFetchResponse.text().catch(() => "Could not read error body");
+        console.error(`Failed to fetch processed image from ${processedImageExternalUrl}: ${imageFetchResponse.status}`, errorBody);
+        throw new Error(`Failed to fetch processed image from ${processedImageExternalUrl}: ${imageFetchResponse.statusText}. Details: ${errorBody}`);
+      }
+      
+      const fetchedImageArrayBuffer = await imageFetchResponse.arrayBuffer();
+      const fetchedImageBuffer = Buffer.from(fetchedImageArrayBuffer);
+      const fetchedMimeType = imageFetchResponse.headers.get('content-type') || 'image/png';
+
+      const processedImageDataUri = `data:${fetchedMimeType};base64,${fetchedImageBuffer.toString('base64')}`;
+      
+      return { processedImageDataUri: processedImageDataUri };
     } else {
-      throw new Error('Invalid response format from the API.');
+      console.error("Invalid API response structure from external background removal service:", result);
+      throw new Error('Invalid response format from the external background removal API or missing URL.');
     }
   }
 );
