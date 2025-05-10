@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useActionState } from 'react';
+import React, { useState, useEffect, useActionState, useTransition } from 'react';
 import { uploadAndProcessImageServerAction, type ActionState } from '@/lib/actions';
 import UploadForm from '@/components/upload-form';
 import ImageComparison from '@/components/image-comparison';
@@ -29,6 +29,8 @@ export default function ImageProcessor() {
     uploadAndProcessImageServerAction,
     initialState
   );
+  // const [isTransitionPending, startTransition] = useTransition();
+
 
   useEffect(() => {
     if (state?.message) {
@@ -78,7 +80,7 @@ export default function ImageProcessor() {
         <Card className="shadow-xl overflow-hidden border-border">
           <CardHeader>
             <CardTitle className="text-2xl font-semibold">Upload Your Image</CardTitle>
-            <CardDescription>Select an image file (PNG, JPG, JPEG) up to 20MB. The background will be magically erased!</CardDescription>
+            <CardDescription>Select an image file (PNG, JPG, JPEG) up to 5MB. The background will be magically erased!</CardDescription>
           </CardHeader>
           <CardContent>
             <UploadForm 

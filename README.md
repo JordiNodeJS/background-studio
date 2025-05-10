@@ -1,4 +1,4 @@
-
+md
 # Background Eraser Pro
 
 Background Eraser Pro is a Next.js 15 application that allows users to upload images, remove their backgrounds using an AI model, and compare the original image with the processed one using a side-by-side slider.
@@ -7,7 +7,7 @@ This application is built with Next.js App Router, Server Actions, and Genkit fo
 
 ## Core Features
 
-- **Image Upload**: Users can upload images (PNG, JPG, JPEG, up to 20MB) from their local device with client-side validation and preview.
+- **Image Upload**: Users can upload images (PNG, JPG, JPEG, up to 5MB) from their local device with client-side validation and preview.
 - **AI Background Removal**: Uploaded images are processed by a Genkit AI flow (utilizing Google AI) to remove the background.
 - **Image Comparison**: A visual interface displays the original and processed images side-by-side with a draggable slider for easy comparison. The comparison view dynamically adjusts to the aspect ratio of the uploaded image.
 - **Toast Notifications**: Users receive clear feedback on the success or failure of operations through toast notifications.
@@ -109,10 +109,10 @@ npm run genkit:watch
 
 ## Background Removal Process
 
-1.  The user selects an image through the `UploadForm.tsx` component. Client-side validation (file type, size up to 20MB) occurs, and upload progress is displayed.
+1.  The user selects an image through the `UploadForm.tsx` component. Client-side validation (file type, size up to 5MB) occurs, and upload progress is displayed.
 2.  Upon submission, the form data is passed to a Server Action (`uploadAndProcessImageServerAction` in `actions.ts`).
 3.  The Server Action:
-    a.  Validates the file again on the server (up to 20MB).
+    a.  Validates the file again on the server (up to 5MB).
     b.  Saves the original image to the `public/images-input/` directory.
     c.  Converts the image to a data URI.
     d.  Calls the `removeBackground` Genkit flow (from `src/ai/flows/remove-background.ts`) with the image data URI.
@@ -130,4 +130,3 @@ npm run genkit:watch
 -   **Styling**: The application uses Tailwind CSS and ShadCN UI components, adhering to the professional design specifications provided (neutral grays, soft blues, teal accents).
 -   **Upload Progress**: Upload progress is simulated on the client-side for immediate user feedback. Server-side processing time is separate and indicated by a general "processing" state.
 
-```

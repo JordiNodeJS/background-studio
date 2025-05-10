@@ -38,8 +38,8 @@ export default function UploadForm({ formAction, isActionFormPending, uploadProg
         setPreviewUrl(null);
         return;
       }
-      if (file.size > 20 * 1024 * 1024) { // 20MB
-        setFileError('File is too large. Maximum size is 20MB.');
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        setFileError('File is too large. Maximum size is 5MB.');
         if (fileInputRef.current) fileInputRef.current.value = "";
         setFileName(null);
         setPreviewUrl(null);
@@ -134,7 +134,7 @@ export default function UploadForm({ formAction, isActionFormPending, uploadProg
               <p className="mb-2 text-sm text-muted-foreground">
                 <span className="font-semibold text-primary">Click to upload</span> or drag and drop
               </p>
-              <p className="text-xs text-muted-foreground">PNG, JPG, JPEG (MAX. 20MB)</p>
+              <p className="text-xs text-muted-foreground">PNG, JPG, JPEG (MAX. 5MB)</p>
             </div>
           )}
           {uploadProgress !== null && uploadProgress < 100 && (

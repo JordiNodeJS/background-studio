@@ -10,7 +10,7 @@ import type { RemoveBackgroundInput } from '@/ai/flows/remove-background';
 const inputDir = path.join(process.cwd(), 'public', 'images-input');
 const outputDir = path.join(process.cwd(), 'public', 'images-output');
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 
 const fileToDataUri = (fileBuffer: Buffer, mimeType: string): string => {
@@ -59,7 +59,7 @@ export async function uploadAndProcessImageServerAction(
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return { ...prevState, error: 'File is too large. Maximum size is 20MB.', uploadProgress: null };
+      return { ...prevState, error: 'File is too large. Maximum size is 5MB.', uploadProgress: null };
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -69,11 +69,6 @@ export async function uploadAndProcessImageServerAction(
     const originalPublicUrl = `/images-input/${originalFilename}`;
 
     await writeFile(originalPath, fileBuffer);
-
-    // Simulate upload progress completion for the server part
-    // Actual streaming upload progress would require a different setup (e.g., websockets or a dedicated upload handler)
-    // For Server Actions, we consider upload complete once the file is on the server.
-    // The client-side will handle its part of the progress display.
     
     const originalImageDataUri = fileToDataUri(fileBuffer, file.type);
     
@@ -117,7 +112,7 @@ export async function uploadAndProcessImageServerAction(
     let originalPublicUrlOnError = null;
     if (file) {
         try {
-            const originalFileExtension = path.extname(file.name) || `.${file.type.split('/')[1] || 'png'}`;
+            // const originalFileExtension = path.extname(file.name) || `.${file.type.split('/')[1] || 'png'}`;
             // This tempOriginalFilename logic isn't robust for server actions like this.
             // If the file save failed, the URL might not be valid.
             // For simplicity, we'll just pass null if there was an error before saving.
