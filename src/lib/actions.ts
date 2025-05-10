@@ -115,6 +115,8 @@ export async function uploadAndProcessImageServerAction(
 
     await writeFile(processedPath, processedImageBuffer);
     
+    console.log('Processed image saved to:', processedPath);
+    console.log('Processed image public URL:', processedPublicUrl);
     return {
       message: 'Image processed successfully!',
       originalImageUrl: originalPublicUrl,
