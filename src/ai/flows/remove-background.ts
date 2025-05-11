@@ -63,7 +63,7 @@ const removeBackgroundFlow = ai.defineFlow(
       model: 'googleai/gemini-2.0-flash-exp',
 
       // simple prompt
-      prompt: [{media: {url: input.imageDataUri}}, {text: 'Remove the background from this image'}],
+      prompt: [{media: {url: input.imageDataUri}}, {text: 'A high-quality image of a subject (person, object, etc.) on a diverse or complex background. Remove the background completely and precisely, leaving only the subject with a transparent background. The subject should be clearly defined and all remnants of the original background should be eliminated.'}],
       // OR, existing images can be provided in-context for editing, character reuse, etc.
       // prompt: [
       //   {media: {url: 'data:<mime_type>;base64,<b64_encoded_image>'}},
